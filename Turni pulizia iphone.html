@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Turni Pulizie Casa</title>
+<style>
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    background-color: #f5f6f7;
+    color: #333;
+    margin: 0;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #222;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #2f4050;
+    margin-top: 1.8rem;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+
+  table {
+    width: 100%;
+    max-width: 500px;
+    border-collapse: collapse;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  th, td {
+    padding: 0.8rem;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  th {
+    background: #2f4050;
+    color: white;
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  td {
+    font-size: 0.95rem;
+    color: #333;
+  }
+
+  tr:nth-child(even) td {
+    background-color: #fafafa;
+  }
+
+  /* Rimosso il transform: scale per compatibilità Safari */
+  .main-table {
+    margin-top: 1rem;
+  }
+
+  .buttons {
+    margin-top: 1.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    justify-content: center;
+  }
+
+  button {
+    background: #2f4050;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+    -webkit-appearance: none;
+  }
+
+  button:hover {
+    background: #1d2a36;
+  }
+
+  #editPanel {
+    display: none;
+    margin-top: 1.2rem;
+    background: #fff;
+    padding: 1.2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+  }
+
+  #editPanel h3 {
+    margin-top: 0;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  #inputs div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+  }
+
+  label {
+    font-weight: 500;
+    color: #444;
+    font-size: 0.9rem;
+  }
+
+  input {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 55%;
+    font-size: 0.9rem;
+    -webkit-appearance: none;
+  }
+
+  footer {
+    margin-top: 2rem;
+    color: #666;
+    font-size: 0.8rem;
+    text-align: center;
+  }
+
+  /* Responsive fix */
+  @media (max-width: 480px) {
+    th, td {
+      padding: 0.6rem;
+      font-size: 0.85rem;
+    }
+    input {
+      width: 60%;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Turni delle Pulizie Settimanali</h1>
+
+  <h2 id="titoloCorrente"></h2>
+  <table class="main-table" id="tabellaTurniCorrente">
+    <thead><tr id="intestazioniCorrente"></tr></thead>
+    <tbody><tr id="nomiCorrente"></tr></tbody>
+  </table>
+
+  <h2 id="titoloPrecedente"></h2>
+  <table id="tabellaTurniPrecedente">
+    <thead><tr id="intestazioniPrecedente"></tr></thead>
+    <tbody><tr id="nomiPrecedente"></tr></tbody>
+  </table>
+
+  <div class="buttons">
+    <button id="editButton">Modifica Nomi</button>
+  </div>
+
+  <div id="editPanel">
+    <h3>Modifica i nomi dei coinquilini</h3>
+    <div id="inputs"></div>
+    <button id="saveButton">Salva Modifiche</button>
+  </div>
+
+  <footer>I turni si aggiornano automaticamente ogni lunedì.</footer>
+
+<script>
+const posti = ["Cucina", "Salotto", "Corridoio + Spazzatura", "Bagno"];
+const defaultPersone = ["Chiara", "Filippo", "Julia", "Francesco"];
+
+function getPersone() {
+  try {
+    const salvate = localStorage.getItem("personePulizie");
+    return salvate ? JSON.parse(salvate) : defaultPersone;
+  } catch {
+    // Safari in modalità privata può bloccare localStorage
+    return defaultPersone;
+  }
+}
+
+function salvaPersone(arr) {
+  try {
+    localStorage.setItem("personePulizie", JSON.stringify(arr));
+  } catch {
+    // Ignora se localStorage non è disponibile
+  }
+}
+
+function settimaneDaDataBase() {
+  const dataBase = new Date(2025, 0, 6);
+  const oggi = new Date();
+  const diff = oggi - dataBase;
+  return Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+}
+
+function ruotaArray(arr, n) {
+  const l = arr.length;
+  const offset = ((n % l) + l) % l;
+  return arr.slice(-offset).concat(arr.slice(0, -offset));
+}
+
+function getIntervalloSettimana(offsetSettimane = 0) {
+  const oggi = new Date();
+  const giornoSettimana = oggi.getDay();
+  const diffLunedi = (giornoSettimana === 0 ? -6 : 1 - giornoSettimana) + offsetSettimane*7;
+  const lunedi = new Date(oggi);
+  lunedi.setDate(oggi.getDate() + diffLunedi);
+  const domenica = new Date(lunedi);
+  domenica.setDate(lunedi.getDate() + 6);
+  const format = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+  return `${format(lunedi)} - ${format(domenica)}`;
+}
+
+function mostraTurni() {
+  const persone = getPersone();
+  const settimane = settimaneDaDataBase();
+
+  const personeCorrente = ruotaArray(persone, settimane);
+  const personePrecedente = ruotaArray(persone, settimane - 1);
+
+  document.getElementById("titoloCorrente").textContent = `Settimana Corrente: ${getIntervalloSettimana(0)}`;
+  document.getElementById("titoloPrecedente").textContent = `Settimana Precedente: ${getIntervalloSettimana(-1)}`;
+
+  const intestCorr = document.getElementById("intestazioniCorrente");
+  const nomiCorr = document.getElementById("nomiCorrente");
+  intestCorr.innerHTML = "";
+  nomiCorr.innerHTML = "";
+
+  const intestPrec = document.getElementById("intestazioniPrecedente");
+  const nomiPrec = document.getElementById("nomiPrecedente");
+  intestPrec.innerHTML = "";
+  nomiPrec.innerHTML = "";
+
+  posti.forEach((posto, i) => {
+    const th1 = document.createElement("th");
+    th1.textContent = posto;
+    intestCorr.appendChild(th1);
+
+    const td1 = document.createElement("td");
+    td1.textContent = personeCorrente[i];
+    nomiCorr.appendChild(td1);
+
+    const th2 = document.createElement("th");
+    th2.textContent = posto;
+    intestPrec.appendChild(th2);
+
+    const td2 = document.createElement("td");
+    td2.textContent = personePrecedente[i];
+    nomiPrec.appendChild(td2);
+  });
+}
+
+const editButton = document.getElementById("editButton");
+const editPanel = document.getElementById("editPanel");
+const inputsDiv = document.getElementById("inputs");
+const saveButton = document.getElementById("saveButton");
+
+editButton.addEventListener("click", () => {
+  const persone = getPersone();
+  inputsDiv.innerHTML = "";
+  persone.forEach((nome, i) => {
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <label>${posti[i]}:</label>
+      <input type="text" id="nome${i}" value="${nome}">
+    `;
+    inputsDiv.appendChild(row);
+  });
+  editPanel.style.display = "block";
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+});
+
+saveButton.addEventListener("click", () => {
+  const nuovi = posti.map((_, i) =>
+    document.getElementById(`nome${i}`).value.trim() || defaultPersone[i]
+  );
+  salvaPersone(nuovi);
+  editPanel.style.display = "none";
+  mostraTurni();
+});
+
+mostraTurni();
+</script>
+</body>
+</html>
